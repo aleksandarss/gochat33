@@ -13,5 +13,5 @@ func main() {
 
 	defer sock.Close()
 	fmt.Println("Connected to the server:", sock.RemoteAddr())
-	_, err = sock.Write([]byte("Hello there server! How is it going?"))
+	_, err = sock.Write([]byte("username:sa1e"))
 }
