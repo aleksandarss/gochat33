@@ -13,9 +13,11 @@ type Client struct {
 }
 
 type Message struct {
-	src     string
-	dst     string
-	content string
+	src        string
+	dst        string
+	msgcontent string
+	req        string
+	username   string
 }
 
 const PORT string = "8080"
@@ -25,13 +27,13 @@ const CONN_TYPE string = "tcp"
 /*
 PROTOCOL NOTES:
 1. Server starts
-2. Client 1 connects and publishes its username -> "username:<some_username>"
-3. Client 2 connects and also publishes its username -> "username:<second_username>"
-4. Either client sends a message -> "src:<username>;dst:<username>;msg:<message to the other client>"
+2. Client 1 connects and publishes its username -> "req:register;\nusername:<some_username>"
+3. Client 2 connects and also publishes its username -> "req:register;\nusername:<second_username>"
+4. Either client sends a message -> "req:send;\nsrc:<username>;\ndst:<username>;\nmsg:<message to the other client>"
 */
 
 func main() {
-	clients := make([]Client, 8)
+	clients := make([]Client, 0)
 
 	sock, err := net.Listen(CONN_TYPE, HOST+":"+PORT)
 	if err != nil {
@@ -63,16 +65,65 @@ func handleConnection(conn net.Conn, clients *[]Client) {
 		panic(err)
 	}
 	fmt.Println("Received message:", string(buffer[:messageLen]))
-	if strings.Index(string(buffer[:messageLen]), "username:") != -1 {
-		fmt.Printf("Client at addr: [%s] wants to register to the chat ...", conn.RemoteAddr())
-		registerNewClient(&conn, clients)
+
+	message := getRequestParams(&buffer)
+
+	fmt.Println("Request params: ", message)
+
+	switch message.req {
+	case "register":
+		registerNewClient(message.username, conn.RemoteAddr().String(), clients)
+	default:
+		fmt.Printf("[INFO] Functionality for request = [%s] not implemented yet\n", message.req)
 	}
+
+	fmt.Println("Registered clients:", clients)
 }
 
-func getMessageParams(message *[]byte) {
+func getRequestParams(request *[]byte) (message Message) {
+	messageStr := string(*request)
 
+	params := strings.Split(messageStr, ";\n")
+
+	for _, param := range params {
+		paramParts := strings.Split(param, ":")
+
+		switch key := paramParts[0]; key {
+		case "req":
+			message.req = paramParts[1]
+		case "username":
+			message.username = paramParts[1]
+		case "src":
+			message.src = paramParts[1]
+		case "dst":
+			message.dst = paramParts[1]
+		case "msgcontent":
+			message.msgcontent = paramParts[1]
+		default:
+			fmt.Printf("[ERROR] (getRequstType): param = [%s] not accepted.\n", key)
+		}
+	}
+
+	return message
 }
 
-func registerNewClient(conn *net.Conn, clients *[]Client) {
+func registerNewClient(username string, address string, clients *[]Client) {
+	*clients = append(*clients, Client{
+		username: username,
+		host:     strings.Split(address, ":")[0],
+		port:     strings.Split(address, ":")[1],
+	})
+}
+
+func getClientByUsername(username string, clients *[]Client) (client Client) {
+	for _, client := range *clients {
+		if client.username == username {
+			return client
+		}
+	}
+	return client
+}
+
+func sendMessage(srcClient, dstClient *Client, message string) {
 
 }
